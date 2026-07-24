@@ -31,19 +31,19 @@ WHERE
     
     AND (
         cc.code IN ('510', '512', '515', '520', '530', '536', '540', '550', '553', '560', '570')
-        OR cc.name->>'2' ILIKE '%Montáž%' -- 560
-        OR cc.name->>'2' ILIKE '%Elektromontáž%' -- 570
-        OR cc.name->>'2' ILIKE '%Předvýroba%' -- 553
-        OR cc.name->>'2' ILIKE '%Výroba%' -- 550
-        OR cc.name->>'2' ILIKE '%Konstrukce%' -- 540
-        OR cc.name->>'2' ILIKE '%Servis%' -- 536
-        OR cc.name->>'2' ILIKE '%Obchod%' -- 530
-        OR cc.name->>'2' ILIKE '%Ekonomika%' -- 520
-        OR cc.name->>'2' ILIKE '%Provoz%' -- 515
-        OR cc.name->>'2' ILIKE '%Vedení%' -- 510
-        OR cc.name->>'2' ILIKE '%IT%' -- 512
+        OR cc.name->>'2' ILIKE '%Středisko A%' -- 560
+        OR cc.name->>'2' ILIKE '%Středisko B%' -- 570
+        OR cc.name->>'2' ILIKE '%Středisko C%' -- 553
+        OR cc.name->>'2' ILIKE '%Středisko D%' -- 550
+        OR cc.name->>'2' ILIKE '%Středisko E%' -- 540
+        OR cc.name->>'2' ILIKE '%Středisko F%' -- 536
+        OR cc.name->>'2' ILIKE '%Středisko G%' -- 530
+        OR cc.name->>'2' ILIKE '%Středisko H%' -- 520
+        OR cc.name->>'2' ILIKE '%Středisko I%' -- 515
+        OR cc.name->>'2' ILIKE '%Středisko J%' -- 510
+        OR cc.name->>'2' ILIKE '%Středisko K%' -- 512
     )
-    -- bez 802, 803, 804 Dotace a 600 Budova Pod lesem
+    -- bez 802 Dotace a 600 Budova
 
     AND adt.name->>'2' NOT ILIKE '%interní%'
     
