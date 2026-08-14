@@ -24,7 +24,7 @@ SELECT
         SUBSTRING(g.name::text FROM 8 FOR POSITION('"' IN SUBSTRING(g.name::text FROM 8)) - 1)
     ) AS davka, 
     
-    CONCAT('https://factorify.pbt-works.com/ui/batch/', b.number) AS link_batch,
+    CONCAT('https://company.com/ui/batch/', b.number) AS link_batch,
     
     ROUND(((EXTRACT(EPOCH FROM (bwe.finished_at - bwe.started_at)) / 60) - (bwe.standard_time_minutes / NULLIF(bwe.batch_quantity, 0) * bwe.count))::numeric, 1) AS diff_time
 FROM batch_work_evidence bwe
