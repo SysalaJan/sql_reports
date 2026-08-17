@@ -23,13 +23,15 @@ SELECT
         ' ', 
         g.code, 
         ' ', 
-        CASE 
-            WHEN g.name::text LIKE '%"%"%' THEN SPLIT_PART(g.name::text, '"', 2)
-            ELSE g.name::text
-        END
+        COALESCE(
+            g.name->>'2',
+            g.name->>'cz',
+            g.name->>'1',
+            g.name::text
+        )
     ) AS davka, 
     
-    CONCAT('https://company.com', b.number) AS batch_url,
+    CONCAT('https://company.com/ui/batch/', b.number) AS batch_url,
     
     ROUND(((EXTRACT(EPOCH FROM (COALESCE(bwe.finished_at, NOW()) - bwe.started_at)) / 60) - (bwe.standard_time_minutes / NULLIF(bwe.batch_quantity, 0) * bwe.count))::numeric, 1) AS diff_time
 FROM batch_work_evidence bwe
@@ -41,4 +43,4 @@ LEFT JOIN goods g ON b.goods_id = g.id
 WHERE bwe.deleted = false
   AND bwe.started_at <= NOW()
   AND bwe.started_at > NOW() - INTERVAL '30 days'
-ORDER BY bwe.started_at DESC;
+ORDER BY bwe.started_at DESC
