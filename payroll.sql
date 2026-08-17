@@ -1,7 +1,7 @@
 SELECT 
     p.firstname AS jmeno,
     p.lastname AS prijmeni,
-    pc.birth_number AS rodne_cislo,
+    --pc.birth_number AS rodne_cislo,
     
     COALESCE(jp.name->>'cs', jp.name_in_contract) AS pracovni_pozice,
     
