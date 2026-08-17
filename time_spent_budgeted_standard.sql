@@ -29,7 +29,7 @@ SELECT
         END
     ) AS davka, 
     
-    CONCAT('https://pbt-works.com', b.number) AS batch_url,
+    CONCAT('https://company.com', b.number) AS batch_url,
     
     ROUND(((EXTRACT(EPOCH FROM (COALESCE(bwe.finished_at, NOW()) - bwe.started_at)) / 60) - (bwe.standard_time_minutes / NULLIF(bwe.batch_quantity, 0) * bwe.count))::numeric, 1) AS diff_time
 FROM batch_work_evidence bwe
