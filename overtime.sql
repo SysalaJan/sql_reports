@@ -3,7 +3,6 @@ prescasy AS (
     SELECT
         pe.*,
         nalezena_davka.id AS nalezene_id_davky
-
     FROM process_executions pe
 
     LEFT JOIN LATERAL (
@@ -37,7 +36,6 @@ navaznosti (vychozi_id, id_davky) AS (
     SELECT
         n.vychozi_id,
         m.using_supply_id
-
     FROM navaznosti n
 
     JOIN planning_output.supply_demand_matches m
@@ -51,7 +49,6 @@ planovane_objednavky AS (
     SELECT DISTINCT
         n.vychozi_id,
         soi.sales_order_id
-
     FROM navaznosti n
 
     JOIN planning_output.supply_demand_matches m
@@ -69,7 +66,6 @@ prime_objednavky AS (
     SELECT
         n.vychozi_id,
         soi.sales_order_id
-
     FROM navaznosti n
 
     JOIN batches nb
@@ -85,7 +81,6 @@ prime_objednavky AS (
     SELECT
         n.vychozi_id,
         so.id
-
     FROM navaznosti n
 
     JOIN batches nb
@@ -106,7 +101,6 @@ vazby_objednavek AS (
     SELECT
         pr.vychozi_id,
         pr.sales_order_id
-
     FROM prime_objednavky pr
 
     WHERE NOT EXISTS (
@@ -126,7 +120,6 @@ souhrn_objednavek AS (
         ) AS cisla_objednavek,
 
         COUNT(*) AS pocet,
-
         MIN(so.id) AS jedina_objednavka
 
     FROM vazby_objednavek v
@@ -140,7 +133,6 @@ souhrn_objednavek AS (
 cisla_stroju AS (
     SELECT
         v.vychozi_id,
-
         NULLIF(
             BTRIM(so.free_attributes ->> 'MACHINE_NO'),
             ''
@@ -152,9 +144,9 @@ cisla_stroju AS (
         ON so.id = v.sales_order_id
 
     UNION
+
     SELECT
         n.vychozi_id,
-
         NULLIF(
             BTRIM(sn.serial_number),
             ''
@@ -176,16 +168,109 @@ souhrn_stroju AS (
         ) AS vyrobni_cisla
 
     FROM cisla_stroju
-
     WHERE cislo IS NOT NULL
-
     GROUP BY vychozi_id
+),
+
+casy_prescasu AS (
+    SELECT
+        pe.id AS proces_id,
+        pe.entity_id AS person_id,
+
+        NULLIF(
+            BTRIM(pe.free_attributes ->> 'overtime_from'),
+            ''
+        )::timestamp AS od,
+
+        NULLIF(
+            BTRIM(pe.free_attributes ->> 'overtime_to'),
+            ''
+        )::timestamp AS do
+
+    FROM prescasy pe
+),
+
+automaticke_zaznamy AS (
+    SELECT DISTINCT
+        ar.id
+
+    FROM casy_prescasu cp
+
+    JOIN process_step_executions pse
+        ON pse.process_execution_id = cp.proces_id
+
+    JOIN process_step_definitions psd
+        ON psd.id = pse.process_step_definition_id
+       AND psd.type IN (
+           'FILL_TASK',
+           'AUTOMATIC_FILL_TASK'
+       )
+
+    JOIN attendance_records ar
+        ON ar.person_id = cp.person_id
+
+       AND (
+           (ar.type = 'ARRIVE' AND ar.time = cp.od)
+           OR
+           (ar.type = 'LEAVE' AND ar.time = cp.do)
+       )
+
+       AND ar.ip_address IS NULL
+       AND COALESCE(ar.is_break, FALSE) = FALSE
+       AND ar.updated_at <= ar.created_at
+
+       AND ar.created_at >=
+           COALESCE(pse.started_at, pse.created_at)
+           - INTERVAL '1 second'
+
+       AND ar.created_at <=
+           COALESCE(pse.finished_at, pse.updated_at)
+           + INTERVAL '1 second'
+),
+
+skutecne_prescasy AS (
+    SELECT
+        cp.proces_id,
+
+        CASE
+            WHEN odchod.cas IS NOT NULL THEN cp.od
+        END AS skutecny_prescas_od,
+
+        odchod.cas AS skutecny_prescas_do
+
+    FROM casy_prescasu cp
+
+    LEFT JOIN LATERAL (
+        SELECT
+            MAX(ar.time) AS cas
+
+        FROM attendance_records ar
+
+        WHERE ar.person_id = cp.person_id
+          AND ar.type = 'LEAVE'
+          AND COALESCE(ar.is_break, FALSE) = FALSE
+
+          AND cp.do > cp.od
+          AND ar.time > cp.od
+          AND ar.time <
+              cp.do::date + INTERVAL '1 day'
+
+          AND ar.time <= LOCALTIMESTAMP
+
+          AND NOT EXISTS (
+              SELECT 1
+              FROM automaticke_zaznamy az
+              WHERE az.id = ar.id
+          )
+
+    ) odchod ON TRUE
 )
 
 SELECT
     pe.id::text AS proces_id,
 
-    pe.free_attributes ->> 'overtime_ordered_by' AS zadal,
+    pe.free_attributes ->> 'overtime_ordered_by'
+        AS zadal,
 
     p.firstname AS jmeno,
     p.lastname AS prijmeni,
@@ -206,6 +291,16 @@ SELECT
         'DD.MM.YYYY HH24:MI'
     ) AS prescas_do,
 
+    TO_CHAR(
+        skutecnost.skutecny_prescas_od,
+        'DD.MM.YYYY HH24:MI'
+    ) AS skutecny_prescas_od,
+
+    TO_CHAR(
+        skutecnost.skutecny_prescas_do,
+        'DD.MM.YYYY HH24:MI'
+    ) AS skutecny_prescas_do,
+
     pe.free_attributes ->> 'batch_number' AS davka,
 
     b.id AS id_davky,
@@ -216,12 +311,16 @@ SELECT
     COALESCE(
         stroje.vyrobni_cisla,
         NULLIF(
-            BTRIM(pe.free_attributes ->> 'machine_serial_number'),
+            BTRIM(
+                pe.free_attributes
+                ->> 'machine_serial_number'
+            ),
             ''
         )
     ) AS seriove_cislo_stroje,
 
-    objednavky.cisla_objednavek AS prodejni_objednavka,
+    objednavky.cisla_objednavek
+        AS prodejni_objednavka,
 
     CASE
         WHEN objednavky.pocet = 1 THEN
@@ -237,12 +336,16 @@ SELECT
 
 FROM prescasy pe
 
+LEFT JOIN skutecne_prescasy skutecnost
+    ON skutecnost.proces_id = pe.id
+
 LEFT JOIN people p
     ON p.id = pe.entity_id
 
 LEFT JOIN enum_values ev
     ON ev.enum_id = 'overtime_reason'
-   AND ev.code = pe.free_attributes ->> 'overtime_reason'
+   AND ev.code =
+       pe.free_attributes ->> 'overtime_reason'
 
 LEFT JOIN batches b
     ON b.id = pe.nalezene_id_davky
